@@ -1,47 +1,101 @@
-import React, { useState } from 'react';
-import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ArrowLeft, User, Mail, Phone, GraduationCap, Calendar, Clock, MapPin, CheckCircle } from 'lucide-react';
+// src/components/CheckinForm.jsx (Com verificação de inscrição duplicada)
 
-const CheckinForm = ({ event, onBack }) => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    course: '',
-  });
+import React, { useState, useMemo } from 'react';
+import { db } from '../firebase';
+// <-- ADIÇÃO: Importar 'query', 'where', e 'getDocs' para a verificação -->
+import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { toast } from 'react-hot-toast';
+import { ArrowLeft, User, Mail, Phone, GraduationCap, Calendar, Clock, MapPin, CheckCircle, Search, Hash, AlertTriangle } from 'lucide-react';
+
+const CheckinForm = ({ event, onBack, allStudents }) => {
+  const [searchInput, setSearchInput] = useState('');
+  const [selectedStudent, setSelectedStudent] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  // <-- ADIÇÃO: Novos estados para controlar a verificação -->
+  const [isChecking, setIsChecking] = useState(false);
+  const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
 
+  const searchResults = useMemo(() => {
+    if (!searchInput || searchInput.length < 2) return [];
+    const lowercasedInput = searchInput.toLowerCase();
+    return allStudents
+      .filter(student => 
+        student.name.toLowerCase().includes(lowercasedInput) ||
+        student.code.toString().includes(lowercasedInput)
+      )
+      .slice(0, 5);
+  }, [searchInput, allStudents]);
+
+  // <-- ALTERAÇÃO: 'handleSelectStudent' agora chama a verificação -->
+  const handleSelectStudent = async (student) => {
+    setSearchInput(''); 
+    setIsChecking(true); // Inicia a verificação
+    setIsAlreadyRegistered(false);
+
+    // Query para verificar se o aluno já está inscrito no evento
+    const registrationQuery = query(
+      collection(db, 'event_registrations'),
+      where('eventId', '==', event.id),
+      where('name', '==', student.name) // Usando o 'name' do aluno como identificador único na inscrição
+    );
+
+    try {
+      const querySnapshot = await getDocs(registrationQuery);
+      if (!querySnapshot.empty) {
+        // Se encontrar qualquer registro, o aluno já está inscrito
+        setIsAlreadyRegistered(true);
+      } else {
+        // Caso contrário, pode prosseguir
+        setSelectedStudent(student);
+      }
+    } catch (error) {
+      console.error("Erro ao verificar inscrição:", error);
+      toast.error("Ocorreu um erro ao verificar sua inscrição.");
+    } finally {
+      setIsChecking(false); // Finaliza a verificação
+    }
+  };
+  
+  const handleResetSelection = () => {
+    setSelectedStudent(null);
+    setIsAlreadyRegistered(false);
+  };
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!selectedStudent) {
+      toast.error("Por favor, busque e selecione seu nome na lista.");
+      return;
+    }
     setIsSubmitting(true);
 
     try {
       await addDoc(collection(db, 'event_registrations'), {
-        ...formData,
+        name: selectedStudent.name,
+        course: selectedStudent.className,
+        email: selectedStudent.email || '', 
+        phone: selectedStudent.phone || '',
         eventId: event.id,
         eventName: event.name,
+        checkedIn: false,
         registrationDate: serverTimestamp(),
       });
 
       setIsSuccess(true);
     } catch (error) {
       console.error('Erro ao fazer inscrição:', error);
-      alert('Erro ao fazer inscrição. Tente novamente.');
+      toast.error('Erro ao fazer inscrição. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // Funções de formatação (sem alterações)
   const formatDate = (dateString) => {
     if (!dateString) return 'Data não definida';
-    return new Date(dateString).toLocaleDateString('pt-BR', { 
+    return new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR', { 
       weekday: 'long',
       year: 'numeric', 
       month: 'long', 
@@ -57,7 +111,8 @@ const CheckinForm = ({ event, onBack }) => {
     }
     return timeString;
   };
-
+  
+  // Tela de sucesso (sem alterações)
   if (isSuccess) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
@@ -82,6 +137,7 @@ const CheckinForm = ({ event, onBack }) => {
     );
   }
 
+  // JSX principal
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -102,7 +158,7 @@ const CheckinForm = ({ event, onBack }) => {
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Informações do Evento */}
+          {/* Informações do Evento (sem alterações) */}
           <div className="bg-white rounded-xl shadow-sm p-6 h-fit">
             <h2 className="text-xl font-bold text-gray-800 mb-4">
               Detalhes do Evento
@@ -153,79 +209,92 @@ const CheckinForm = ({ event, onBack }) => {
             )}
           </div>
 
-          {/* Formulário de Inscrição */}
+          {/* Seção do Formulário */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-6">
               Dados para Inscrição
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
+              {/* Campo de Busca */}
+              <div className="relative">
                 <label className="flex items-center gap-2 text-gray-700 font-medium mb-2">
-                  <User className="w-4 h-4" />
-                  Nome Completo *
+                  <Search className="w-4 h-4" />
+                  Buscar por Matrícula ou Nome *
                 </label>
                 <input
                   type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite seu nome completo"
-                  required
+                  placeholder="Digite para buscar..."
+                  disabled={!!selectedStudent || isAlreadyRegistered}
                 />
+                {searchResults.length > 0 && (
+                  <ul className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-60 overflow-y-auto shadow-lg">
+                    {searchResults.map(student => (
+                      <li
+                        key={student.code}
+                        onClick={() => handleSelectStudent(student)}
+                        className="px-4 py-3 hover:bg-gray-100 cursor-pointer"
+                      >
+                        <p className="font-semibold">{student.name}</p>
+                        <p className="text-sm text-gray-500">{student.code} - {student.className}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
+              
+              {/* <-- ADIÇÃO: Mensagem de verificação e de erro --> */}
+              {isChecking && (
+                <div className="text-center p-4 text-sm text-blue-700">
+                  Verificando inscrição...
+                </div>
+              )}
 
-              <div>
-                <label className="flex items-center gap-2 text-gray-700 font-medium mb-2">
-                  <Mail className="w-4 h-4" />
-                  E-mail *
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite seu e-mail"
-                  required
-                />
-              </div>
+              {isAlreadyRegistered && (
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg">
+                  <div className="flex">
+                    <div className="py-1"><AlertTriangle className="h-5 w-5 text-yellow-500 mr-3" /></div>
+                    <div>
+                      <p className="font-bold text-yellow-800">Inscrição já realizada</p>
+                      <p className="text-sm text-yellow-700">Você já está inscrito(a) neste evento.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              <div>
-                <label className="flex items-center gap-2 text-gray-700 font-medium mb-2">
-                  <Phone className="w-4 h-4" />
-                  Telefone
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite seu telefone"
-                />
-              </div>
+              {/* Campos preenchidos automaticamente */}
+              {selectedStudent && (
+                <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold text-blue-800">Aluno Selecionado</h3>
+                    <button type="button" onClick={handleResetSelection} className="text-sm text-blue-600 hover:underline">
+                        Alterar
+                    </button>
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-gray-700 font-medium mb-2"><Hash className="w-4 h-4" /> Matrícula</label>
+                    <input type="text" value={selectedStudent.code} className="w-full px-4 py-3 bg-gray-200 border-gray-300 rounded-lg cursor-not-allowed" disabled />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-gray-700 font-medium mb-2"><User className="w-4 h-4" /> Nome Completo</label>
+                    <input type="text" value={selectedStudent.name} className="w-full px-4 py-3 bg-gray-200 border-gray-300 rounded-lg cursor-not-allowed" disabled />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-gray-700 font-medium mb-2"><GraduationCap className="w-4 h-4" /> Turma</label>
+                    <input type="text" value={selectedStudent.className} className="w-full px-4 py-3 bg-gray-200 border-gray-300 rounded-lg cursor-not-allowed" disabled />
+                  </div>
+                </div>
+              )}
 
-              <div>
-                <label className="flex items-center gap-2 text-gray-700 font-medium mb-2">
-                  <GraduationCap className="w-4 h-4" />
-                  Curso
-                </label>
-                <input
-                  type="text"
-                  name="course"
-                  value={formData.course}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Digite seu curso (opcional)"
-                />
-              </div>
-
+              {/* Botão de confirmação */}
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-blue-400 transition-colors flex items-center justify-center gap-2"
+                // <-- ALTERAÇÃO: Desabilitar se já estiver inscrito -->
+                disabled={isSubmitting || !selectedStudent || isAlreadyRegistered}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>

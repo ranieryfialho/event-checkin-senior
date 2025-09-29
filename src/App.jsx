@@ -1,13 +1,17 @@
+// src/App.jsx (Com a adição da busca de alunos)
+
 import React, { useState, useEffect } from "react";
 import { db } from "./firebase";
-import { collection, onSnapshot, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, onSnapshot, addDoc, serverTimestamp, query } from "firebase/firestore"; // Adicionado 'query'
 import EventList from "./components/EventList";
 import { Toaster, toast } from "react-hot-toast";
 
 function App() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [allStudents, setAllStudents] = useState([]); // <-- ADIÇÃO: Estado para guardar os alunos
 
+  // Seu useEffect para buscar eventos (sem alterações)
   useEffect(() => {
     const unsubscribe = onSnapshot(
       collection(db, 'events'),
@@ -17,7 +21,6 @@ function App() {
           ...doc.data(),
         }));
         
-        // Filtrar apenas eventos futuros ou do dia atual
         const upcomingEvents = eventsData.filter(event => {
           if (!event.date) return false;
           const eventDate = new Date(event.date);
@@ -27,11 +30,10 @@ function App() {
           return eventDate >= today;
         });
         
-        // Ordenar por data
         upcomingEvents.sort((a, b) => new Date(a.date) - new Date(b.date));
         
         setEvents(upcomingEvents);
-        setLoading(false);
+        // O setLoading será controlado pelo useEffect dos alunos agora
       },
       (error) => {
         console.error('Erro ao carregar eventos:', error);
@@ -43,6 +45,35 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  // <-- ADIÇÃO: Novo useEffect para buscar todos os alunos -->
+  useEffect(() => {
+    const classesQuery = query(collection(db, 'classes'));
+    
+    const unsubscribeClasses = onSnapshot(classesQuery, (snapshot) => {
+      const studentsList = [];
+      snapshot.forEach(doc => {
+        const classData = doc.data();
+        if (classData.students && Array.isArray(classData.students)) {
+          classData.students.forEach(student => {
+            studentsList.push({
+              ...student,
+              className: classData.name 
+            });
+          });
+        }
+      });
+      setAllStudents(studentsList);
+      setLoading(false); // Finaliza o loading após carregar alunos e eventos
+    }, (error) => {
+      console.error('Erro ao carregar turmas/alunos:', error);
+      toast.error('Erro ao carregar dados dos alunos');
+      setLoading(false);
+    });
+
+    return () => unsubscribeClasses();
+  }, []);
+
+  // Sua função handleCheckin original (mantida caso precise dela para outra coisa)
   const handleCheckin = async (checkinData) => {
     try {
       await addDoc(collection(db, 'checkins'), {
@@ -61,6 +92,7 @@ function App() {
     }
   };
 
+  // O restante do seu componente (sem alterações)
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
@@ -97,7 +129,8 @@ function App() {
           },
         }}
       />
-      <EventList events={events} onCheckin={handleCheckin} />
+      {/* <-- ALTERAÇÃO: Passando 'allStudents' e removendo 'onCheckin' que não será mais usado aqui --> */}
+      <EventList events={events} allStudents={allStudents} />
     </>
   );
 }
