@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "boletim-escolar-app"
+  },
+  "targets": {
+    "boletim-escolar-app": {
+      "hosting": {
+        "checkin-evento": [
+          "checkin-evento"
+        ]
+      }
+    }
+  }
+}
