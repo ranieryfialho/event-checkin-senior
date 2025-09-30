@@ -28,6 +28,7 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
     setSearchInput(''); 
     setIsChecking(true);
     setIsAlreadyRegistered(false);
+    setSelectedStudent(null); // Limpa seleção anterior
 
     const registrationQuery = query(
       collection(db, 'event_registrations'),
@@ -39,6 +40,7 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
       const querySnapshot = await getDocs(registrationQuery);
       if (!querySnapshot.empty) {
         setIsAlreadyRegistered(true);
+        setSelectedStudent(student); // Seleciona o aluno para mostrar o nome na mensagem de erro
       } else {
         setSelectedStudent(student);
       }
@@ -55,7 +57,7 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
     setIsAlreadyRegistered(false);
   };
   
- const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedStudent) {
       toast.error("Por favor, selecione um aluno da lista.");
@@ -64,16 +66,27 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
     setIsSubmitting(true);
 
     try {
+      // ### CORREÇÃO PRINCIPAL AQUI ###
+      // Este objeto agora inclui todos os campos necessários para compatibilidade
       await addDoc(collection(db, 'event_registrations'), {
+        // Campos para a lista de presença e portal do aluno
+        name: selectedStudent.name,
+        course: selectedStudent.className,
+        email: selectedStudent.email || '', 
+        phone: selectedStudent.phone || '',
         
+        // Dados do evento e de registro
         eventId: event.id,
         eventName: event.name,
         eventDate: event.date,
         checkedIn: false,
         registrationDate: serverTimestamp(),
       });
+
       setIsSuccess(true);
     } catch (error) {
+      console.error('Erro ao fazer inscrição:', error);
+      toast.error('Erro ao fazer inscrição. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
@@ -239,32 +252,18 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
                     <div className="py-1"><AlertTriangle className="h-5 w-5 text-yellow-500 mr-3" /></div>
                     <div>
                       <p className="font-bold text-yellow-800">Inscrição já realizada</p>
-                      <p className="text-sm text-yellow-700">Você já está inscrito(a) neste evento.</p>
+                      <p className="text-sm text-yellow-700">Você ({selectedStudent?.name}) já está inscrito(a) neste evento.</p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {selectedStudent && (
+              {selectedStudent && !isAlreadyRegistered && (
                 <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-semibold text-blue-800">Aluno Selecionado</h3>
-                    <button type="button" onClick={handleResetSelection} className="text-sm text-blue-600 hover:underline">
-                        Alterar
-                    </button>
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2 text-gray-700 font-medium mb-2"><Hash className="w-4 h-4" /> Matrícula</label>
-                    <input type="text" value={selectedStudent.code} className="w-full px-4 py-3 bg-gray-200 border-gray-300 rounded-lg cursor-not-allowed" disabled />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2 text-gray-700 font-medium mb-2"><User className="w-4 h-4" /> Nome Completo</label>
-                    <input type="text" value={selectedStudent.name} className="w-full px-4 py-3 bg-gray-200 border-gray-300 rounded-lg cursor-not-allowed" disabled />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2 text-gray-700 font-medium mb-2"><GraduationCap className="w-4 h-4" /> Turma</label>
-                    <input type="text" value={selectedStudent.className} className="w-full px-4 py-3 bg-gray-200 border-gray-300 rounded-lg cursor-not-allowed" disabled />
-                  </div>
+                  <div className="flex justify-between items-center"><h3 className="font-semibold text-blue-800">Aluno Selecionado</h3><button type="button" onClick={handleResetSelection} className="text-sm text-blue-600 hover:underline">Alterar</button></div>
+                  <div><label className="flex items-center gap-2 text-gray-700 font-medium mb-2"><Hash className="w-4 h-4" /> Matrícula</label><input type="text" value={selectedStudent.code} className="w-full px-4 py-3 bg-gray-200 border-gray-300 rounded-lg cursor-not-allowed" disabled /></div>
+                  <div><label className="flex items-center gap-2 text-gray-700 font-medium mb-2"><User className="w-4 h-4" /> Nome Completo</label><input type="text" value={selectedStudent.name} className="w-full px-4 py-3 bg-gray-200 border-gray-300 rounded-lg cursor-not-allowed" disabled /></div>
+                  <div><label className="flex items-center gap-2 text-gray-700 font-medium mb-2"><GraduationCap className="w-4 h-4" /> Turma</label><input type="text" value={selectedStudent.className} className="w-full px-4 py-3 bg-gray-200 border-gray-300 rounded-lg cursor-not-allowed" disabled /></div>
                 </div>
               )}
 
@@ -273,14 +272,7 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
                 disabled={isSubmitting || !selectedStudent || isAlreadyRegistered}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Processando...
-                  </>
-                ) : (
-                  'Confirmar Inscrição'
-                )}
+                {isSubmitting ? (<><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>Processando...</>) : ('Confirmar Inscrição')}
               </button>
             </form>
           </div>
