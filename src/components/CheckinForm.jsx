@@ -1,8 +1,5 @@
-// src/components/CheckinForm.jsx (Com verificação de inscrição duplicada)
-
 import React, { useState, useMemo } from 'react';
 import { db } from '../firebase';
-// <-- ADIÇÃO: Importar 'query', 'where', e 'getDocs' para a verificação -->
 import { collection, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'react-hot-toast';
 import { ArrowLeft, User, Mail, Phone, GraduationCap, Calendar, Clock, MapPin, CheckCircle, Search, Hash, AlertTriangle } from 'lucide-react';
@@ -13,7 +10,6 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  // <-- ADIÇÃO: Novos estados para controlar a verificação -->
   const [isChecking, setIsChecking] = useState(false);
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
 
@@ -28,33 +24,29 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
       .slice(0, 5);
   }, [searchInput, allStudents]);
 
-  // <-- ALTERAÇÃO: 'handleSelectStudent' agora chama a verificação -->
   const handleSelectStudent = async (student) => {
     setSearchInput(''); 
-    setIsChecking(true); // Inicia a verificação
+    setIsChecking(true);
     setIsAlreadyRegistered(false);
 
-    // Query para verificar se o aluno já está inscrito no evento
     const registrationQuery = query(
       collection(db, 'event_registrations'),
       where('eventId', '==', event.id),
-      where('name', '==', student.name) // Usando o 'name' do aluno como identificador único na inscrição
+      where('name', '==', student.name)
     );
 
     try {
       const querySnapshot = await getDocs(registrationQuery);
       if (!querySnapshot.empty) {
-        // Se encontrar qualquer registro, o aluno já está inscrito
         setIsAlreadyRegistered(true);
       } else {
-        // Caso contrário, pode prosseguir
         setSelectedStudent(student);
       }
     } catch (error) {
       console.error("Erro ao verificar inscrição:", error);
       toast.error("Ocorreu um erro ao verificar sua inscrição.");
     } finally {
-      setIsChecking(false); // Finaliza a verificação
+      setIsChecking(false);
     }
   };
   
@@ -63,36 +55,30 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
     setIsAlreadyRegistered(false);
   };
   
-  const handleSubmit = async (e) => {
+ const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedStudent) {
-      toast.error("Por favor, busque e selecione seu nome na lista.");
+      toast.error("Por favor, selecione um aluno da lista.");
       return;
     }
     setIsSubmitting(true);
 
     try {
       await addDoc(collection(db, 'event_registrations'), {
-        name: selectedStudent.name,
-        course: selectedStudent.className,
-        email: selectedStudent.email || '', 
-        phone: selectedStudent.phone || '',
+        
         eventId: event.id,
         eventName: event.name,
+        eventDate: event.date,
         checkedIn: false,
         registrationDate: serverTimestamp(),
       });
-
       setIsSuccess(true);
     } catch (error) {
-      console.error('Erro ao fazer inscrição:', error);
-      toast.error('Erro ao fazer inscrição. Tente novamente.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Funções de formatação (sem alterações)
   const formatDate = (dateString) => {
     if (!dateString) return 'Data não definida';
     return new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR', { 
@@ -112,7 +98,6 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
     return timeString;
   };
   
-  // Tela de sucesso (sem alterações)
   if (isSuccess) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
@@ -137,7 +122,6 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
     );
   }
 
-  // JSX principal
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -158,7 +142,6 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Informações do Evento (sem alterações) */}
           <div className="bg-white rounded-xl shadow-sm p-6 h-fit">
             <h2 className="text-xl font-bold text-gray-800 mb-4">
               Detalhes do Evento
@@ -209,14 +192,12 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
             )}
           </div>
 
-          {/* Seção do Formulário */}
           <div className="bg-white rounded-xl shadow-sm p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-6">
               Dados para Inscrição
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Campo de Busca */}
               <div className="relative">
                 <label className="flex items-center gap-2 text-gray-700 font-medium mb-2">
                   <Search className="w-4 h-4" />
@@ -246,7 +227,6 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
                 )}
               </div>
               
-              {/* <-- ADIÇÃO: Mensagem de verificação e de erro --> */}
               {isChecking && (
                 <div className="text-center p-4 text-sm text-blue-700">
                   Verificando inscrição...
@@ -265,7 +245,6 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
                 </div>
               )}
 
-              {/* Campos preenchidos automaticamente */}
               {selectedStudent && (
                 <div className="space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
                   <div className="flex justify-between items-center">
@@ -289,10 +268,8 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
                 </div>
               )}
 
-              {/* Botão de confirmação */}
               <button
                 type="submit"
-                // <-- ALTERAÇÃO: Desabilitar se já estiver inscrito -->
                 disabled={isSubmitting || !selectedStudent || isAlreadyRegistered}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
