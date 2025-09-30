@@ -66,9 +66,10 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
     setIsSubmitting(true);
 
     try {
+      // ### INÍCIO DA CORREÇÃO ###
       await addDoc(collection(db, 'event_registrations'), {
         name: selectedStudent.name,
-        studentCode: selectedStudent.code,
+        studentCode: selectedStudent.code, // Esta linha foi adicionada
         course: selectedStudent.className,
         
         eventId: event.id,
@@ -77,6 +78,7 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
         checkedIn: false,
         registrationDate: serverTimestamp(),
       });
+      // ### FIM DA CORREÇÃO ###
 
       setIsSuccess(true);
     } catch (error) {
