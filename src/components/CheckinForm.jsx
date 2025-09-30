@@ -57,7 +57,7 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
     setIsAlreadyRegistered(false);
   };
   
-  const handleSubmit = async (e) => {
+    const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedStudent) {
       toast.error("Por favor, selecione um aluno da lista.");
@@ -66,16 +66,11 @@ const CheckinForm = ({ event, onBack, allStudents }) => {
     setIsSubmitting(true);
 
     try {
-      // ### CORREÇÃO PRINCIPAL AQUI ###
-      // Este objeto agora inclui todos os campos necessários para compatibilidade
       await addDoc(collection(db, 'event_registrations'), {
-        // Campos para a lista de presença e portal do aluno
         name: selectedStudent.name,
+        studentCode: selectedStudent.code,
         course: selectedStudent.className,
-        email: selectedStudent.email || '', 
-        phone: selectedStudent.phone || '',
         
-        // Dados do evento e de registro
         eventId: event.id,
         eventName: event.name,
         eventDate: event.date,
