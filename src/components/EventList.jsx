@@ -1,16 +1,6 @@
-// src/components/EventList.jsx (Com a passagem da prop 'allStudents')
-
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { db } from "../firebase";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  addDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import {
   Calendar,
   Clock,
@@ -23,9 +13,7 @@ import {
 import CheckinForm from "./CheckinForm";
 import toast from "react-hot-toast";
 
-// <-- ALTERAÇÃO: Recebendo 'allStudents' como prop -->
 const EventList = ({ events, allStudents }) => {
-  // O estado e o useEffect originais foram movidos para App.jsx, esta versão simplificada recebe os dados via props.
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -34,8 +22,6 @@ const EventList = ({ events, allStudents }) => {
     setShowForm(true);
   };
 
-  // A função handleRegistration agora viverá dentro do CheckinForm
-  // mantendo o seu código aqui caso precise dela no futuro.
   const handleRegistration = async (formData) => {
     try {
       await addDoc(collection(db, "registrations"), {
@@ -55,8 +41,8 @@ const EventList = ({ events, allStudents }) => {
     }
   };
 
-  // Suas funções de formatação (sem alterações)
   const formatDate = (dateString) => {
+    if (!dateString) return "Data não definida";
     const date = new Date(dateString + "T00:00:00"); // Garante que a data seja tratada como local
     return date.toLocaleDateString("pt-BR", {
       weekday: "long",
@@ -72,7 +58,8 @@ const EventList = ({ events, allStudents }) => {
   };
 
   const isEventSoon = (dateString) => {
-    const eventDate = new Date(dateString);
+    if (!dateString) return false;
+    const eventDate = new Date(dateString + "T00:00:00");
     const today = new Date();
     const diffTime = eventDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -83,14 +70,12 @@ const EventList = ({ events, allStudents }) => {
     return (
       <CheckinForm
         event={selectedEvent}
-        // <-- ALTERAÇÃO: Passando a lista de alunos para o formulário -->
         allStudents={allStudents}
         onBack={() => setShowForm(false)}
       />
     );
   }
 
-  // O restante do seu JSX (sem alterações)
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Header */}
@@ -156,24 +141,33 @@ const EventList = ({ events, allStudents }) => {
                     </span>
                   </div>
                 )}
+
                 <div className="relative h-48 overflow-hidden">
                   {event.imageUrl ? (
                     <img
                       src={event.imageUrl}
                       alt={event.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      onError={(e) => {
+                        e.target.style.display = "none";
+                        e.target.nextSibling.style.display = "flex";
+                      }}
                     />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 flex items-center justify-center">
-                      <Calendar className="w-16 h-16 text-white/80" />
-                    </div>
-                  )}
+                  ) : null}
+                  <div
+                    className="w-full h-full bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 flex items-center justify-center"
+                    style={{ display: event.imageUrl ? "none" : "flex" }}
+                  >
+                    <Calendar className="w-16 h-16 text-white/80" />
+                  </div>
                   <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                 </div>
+
                 <div className="p-6">
                   <h3 className="text-xl font-bold text-gray-800 mb-3 line-clamp-2 group-hover:text-blue-600 transition-colors">
                     {event.name}
                   </h3>
+
                   <div className="space-y-2 mb-6">
                     <div className="flex items-center text-gray-600">
                       <Calendar className="w-4 h-4 mr-3 text-blue-500 flex-shrink-0" />
@@ -181,21 +175,26 @@ const EventList = ({ events, allStudents }) => {
                         {formatDate(event.date)}
                       </span>
                     </div>
-                    <div className="flex items-center text-gray-600">
-                      <Clock className="w-4 h-4 mr-3 text-purple-500 flex-shrink-0" />
-                      <span className="text-sm">
-                        {formatTime(
-                          event.startTime || event.time,
-                          event.endTime
-                        )}
-                      </span>
-                    </div>
+
+                    {(event.startTime || event.time || event.endTime) && (
+                      <div className="flex items-center text-gray-600">
+                        <Clock className="w-4 h-4 mr-3 text-purple-500 flex-shrink-0" />
+                        <span className="text-sm">
+                          {formatTime(
+                            event.startTime || event.time,
+                            event.endTime
+                          )}
+                        </span>
+                      </div>
+                    )}
+
                     {event.lab && (
                       <div className="flex items-center text-gray-600">
                         <MapPin className="w-4 h-4 mr-3 text-green-500 flex-shrink-0" />
                         <span className="text-sm">{event.lab}</span>
                       </div>
                     )}
+
                     {event.responsible && (
                       <div className="flex items-center text-gray-600">
                         <User className="w-4 h-4 mr-3 text-orange-500 flex-shrink-0" />
@@ -203,11 +202,13 @@ const EventList = ({ events, allStudents }) => {
                       </div>
                     )}
                   </div>
+
                   {event.observations && (
                     <p className="text-gray-500 text-sm mb-6 line-clamp-3">
                       {event.observations}
                     </p>
                   )}
+
                   <button
                     onClick={() => handleEventSelect(event)}
                     className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl flex items-center justify-center gap-2 group"
